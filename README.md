@@ -1,3 +1,3 @@
-# Slot-Machine
+# Slot-Machine 1
 
 test project
