@@ -5,7 +5,7 @@ MIN_BET = 1
 
 def deposit():      #make a function
     while True:
-        amount = input("Enter the amount: $")  #taking input
+        amount = input("Enter the amount: $")  #taking input with print
         if amount.isdigit():
             amount =int(amount)
             if amount>0:
