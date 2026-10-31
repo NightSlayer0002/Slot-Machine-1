@@ -1,84 +1,103 @@
-import random       #we want slot machine to give random values
+"""A small terminal slot machine using virtual credits only."""
 
-MAX_LINES = 3        #defined the value here so that we dont have to change in the entire code
-MAX_BET = 100
+import random
+
+MAX_LINES = 3
 MIN_BET = 1
-
-ROWS = 3            #In this project, we have a 3x3 slot machine and you only get a line when you get 3 in a row, i.e. you win
+MAX_BET = 100
+ROWS = 3
 COLS = 3
+SYMBOL_COUNTS = {"A": 2, "B": 4, "C": 6, "D": 8}
+SYMBOL_VALUES = {"A": 5, "B": 4, "C": 3, "D": 2}
 
-symbol_count = {       #list for machine symbols A, B, C, D with A as most valued symbol
-    "A": 2,
-    "B": 4,
-    "C": 6,
-    "D", 8
-}
 
-#generate the outcome using the values
-def get_slot_machine_spin(rows, cols, symbols):    #we need to generate, randomly pick, what symbols are going to be in each column (3 rows -> 3 symbols inside each col)
-    all_symbols = []
-    for symbol, symbol_count in symbols.items():  #add symbols in the add_symbols list
-        for _ in range(symbol_count):       #_ is an anonymous variable in python, when loop without and extra count/index variable
-            all_symbols.append(symbol)
-            
-    #select what values are going to go in every single column
-    columns = []
-    for col in range(cols):
-        column = []
-        for row in range(rows):
-            value = random.choice(all_symbols)   #random choice from the all_symbols list
-
-def deposit():      #make a function
+def read_integer(prompt, minimum, maximum=None):
+    """Read an integer in range; q, EOF, or Ctrl+C ends the session."""
     while True:
-        amount = input("Enter the amount: $")  #taking input
-        if amount.isdigit():
-            amount =int(amount)
-            if amount>0:
-                break
-            else:
-                print("Amount must be greater than $0")
-        else:
-            print("Please enter a number.")
-    return amount
+        value = input(prompt).strip()
+        if value.lower() == "q":
+            raise EOFError
+        try:
+            number = int(value)
+        except ValueError:
+            print("Enter a whole number.")
+            continue
+        if number >= minimum and (maximum is None or number <= maximum):
+            return number
+        limit = f"{minimum}-{maximum}" if maximum is not None else f"at least {minimum}"
+        print(f"Enter {limit}.")
 
-def get_num_of_lines():
-    while True:
-        lines = input("Enter the number of lines to bet on (1-" + str(MAX_LINES) + "): ")  #converted the MAX_NUM to str for the print, since the rest is a string
-        if lines.isdigit():
-            lines =int(lines)
-            if 1 <= lines <= MAX_LINES:    #if its under the maximum lines
-                break
-            else:
-                print("Enter a validnumber of lines")
-        else:
-            print("Please enter a number.")
-    return lines
 
-def get_bet():
-    while True:
-        amount = input("What would you like to bet on each line: $")  #taking input
-        if amount.isdigit():
-            amount =int(amount)
-            if MIN_BET <= amount <= MAX_BET:
-                break
-            else:
-                print(f"Amount must be bteween ${MIN_BET} - ${MAX_BET}")     #f and {variable} that converts to string if it can be
-        else:
-            print("Please enter a number.")
-    return amount
+def get_slot_machine_spin(rng=None):
+    """Sample each column without replacement from its own symbol pool."""
+    rng = rng if rng is not None else random
+    symbols = [
+        symbol
+        for symbol, count in SYMBOL_COUNTS.items()
+        for _ in range(count)
+    ]
+    return [rng.sample(symbols, ROWS) for _ in range(COLS)]
+
+
+def check_winnings(columns, lines, bet):
+    """Return gross payouts and winning row numbers (starting at one)."""
+    winnings = 0
+    winning_lines = []
+    for row in range(lines):
+        symbol = columns[0][row]
+        if all(column[row] == symbol for column in columns):
+            winnings += SYMBOL_VALUES[symbol] * bet
+            winning_lines.append(row + 1)
+    return winnings, winning_lines
+
+
+def play_round(balance):
+    """Collect an affordable bet, spin, and return the updated balance."""
+    lines = read_integer(
+        f"Lines to bet on (1-{min(MAX_LINES, balance)}, top to bottom): ",
+        1, min(MAX_LINES, balance),
+    )
+    maximum_bet = min(MAX_BET, balance // lines)
+    bet = read_integer(f"Bet per line ({MIN_BET}-{maximum_bet}): ", MIN_BET, maximum_bet)
+    stake = bet * lines
+    columns = get_slot_machine_spin()
+    print()
+    for row in range(ROWS):
+        print(" | ".join(column[row] for column in columns))
+    winnings, winning_lines = check_winnings(columns, lines, bet)
+    print(f"Stake: {stake} | Payout: {winnings} | Net: {winnings - stake:+}")
+    if winning_lines:
+        print("Winning lines: " + ", ".join(map(str, winning_lines)))
+    else:
+        print("No winning lines.")
+    return balance - stake + winnings
+
 
 def main():
-    balance = deposit()   #call the function
-    lines = get_num_of_lines()
-    while True:
-        bet = get_bet()
-        total_bet = bet*lines
-        
-        if total_bet > balance:
-            print(f"You do not have enough to bet that amount, your current balance is ${balance}")
-        else:
-            break
-    
-    print(f"You are betting ${bet} on {lines} lines. Total bet is equal to: ${total_bet}")
+    """Run a session; credits are not persisted between runs."""
+    balance = 0
+    print("Slot Machine | Virtual credits only")
+    print("Match three symbols across a selected horizontal line.")
+    print("Payout per credit: A=5, B=4, C=3, D=2. Enter q anytime to quit.")
+    try:
+        balance = read_integer("Starting credits: ", 1)
+        while balance >= MIN_BET:
+            print(f"\nBalance: {balance} credits")
+            balance = play_round(balance)
+            if balance < MIN_BET:
+                print("No credits remaining.")
+                break
+            while True:
+                choice = input("Press Enter to spin again, or q to quit: ").strip().lower()
+                if choice == "q":
+                    raise EOFError
+                if not choice:
+                    break
+                print("Press Enter or enter q.")
+    except (EOFError, KeyboardInterrupt):
+        print()
+    print(f"Final balance: {balance} credits. Goodbye!")
 
-main()
+
+if __name__ == "__main__":
+    main()
